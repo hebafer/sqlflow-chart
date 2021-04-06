@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.sqlflowserver.name }}
+  labels:
+    {{- include "sqlflow.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "sqlflow.selectorLabels" . | nindent 6 }}
+  {{- if .Values.sqlflowserver.strategy }}
+  strategy:
+{{ toYaml .Values.sqlflowserver.strategy | trim | indent 4 }}
+    {{ if eq .Values.sqlflowserver.strategy.type "Recreate" }}rollingUpdate: null{{ end }}
+{{- end }}
+  template:
+    metadata:
+      {{- with .Values.sqlflowserver.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "sqlflow.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "sqlflowserver.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.jupyterhub.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Values.sqlflowserver.image.name }}
+          securityContext:
+            {{- toYaml .Values.sqlflowserver.securityContext | nindent 12 }}
+          image: {{ .Values.sqlflowserver.image.repository }}
+          imagePullPolicy: {{ .Values.sqlflowserver.image.pullPolicy }}
+          env: {{- toYaml .Values.sqlflowserver.env | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.sqlflowserver.service.servicePort }}
+              protocol: TCP
+          # livenessProbe:
+          #   httpGet:
+          #     path: /health
+          #     port: http
+          # readinessProbe:
+          #   httpGet:
+          #     path: /health
+          #     port: http
+          resources:
+            {{- toYaml .Values.sqlflowserver.resources | nindent 12 }}
+      {{- with .Values.sqlflowserver.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.sqlflowserver.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.sqlflowserver.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

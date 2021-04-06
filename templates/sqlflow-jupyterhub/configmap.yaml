@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ (index .Values.imagePullSecrets 0).name }}
+  labels:
+    heritage: {{ .Release.Service | quote }}
+    release: {{ .Release.Name | quote }}
+data:
+  playground.sqlflow.tech.key: ""
+  playground.sqlflow.tech.pem: ""
