@@ -1,0 +1,765 @@
+rbac:
+  create: true
+
+imagePullSecrets:
+  - name: "image-pull-secret"
+
+## Define serviceAccount names for components. Defaults to component's fully qualified name.
+##
+serviceAccounts:
+  default:
+    create: true
+    name: default
+    annotations: {}
+  sqlflowserver:
+    create: true
+    name: sqlflow-server
+    annotations: {}
+  jupyterhub:
+    create: true
+    name: sqlflow-jupyter
+    annotations: {}
+
+
+sqlflowserver:
+  ## SQLFlow server container name
+  ##
+  name: sqlflow-server
+
+  enabled: true
+
+  podSecurityContext:
+  fsGroup: 65534
+
+  ## Use a ClusterRole (and ClusterRoleBinding)
+  ## - If set to false - we define a RoleBinding in the defined namespaces ONLY
+  ##
+  ## You MUST also set namespaces to the ones you have access to and want monitored by SQLFlow server.
+  ##
+  # useExistingClusterRoleName: nameofclusterrole
+
+  ## namespaces to monitor (instead of monitoring all - clusterwide). Needed if you want to run without Cluster-admin privileges.
+  # namespaces:
+  #   - yournamespace
+
+  # sidecarContainers - add more containers to SQLFlow server
+  # Key/Value where Key is the sidecar `- name: <Key>`
+  # Example:
+  #   sidecarContainers:
+  #      webserver:
+  #        image: nginx
+  sidecarContainers: {}
+
+  ## SQLFlow server container image
+  ##
+  image:
+    name: server
+    repository: sqlflow/sqlflow:server
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  nameOverride: "sqlflow-server"
+  fullnameOverride: "sqlflow-server"
+
+  ## SQLFlow server priorityClassName
+  ##
+  priorityClassName: ""
+
+  ## EnableServiceLinks indicates whether information about services should be injected
+  ## into pod's environment variables, matching the syntax of Docker links.
+  ## WARNING: the field is unsupported and will be skipped in K8s prior to v1.13.0.
+  ##
+  enableServiceLinks: true
+
+  ## The URL prefix at which the container can be accessed. Useful in the case the '-web.external-url' includes a slug
+  ## so that the various internal URLs are still able to access as they are in the default case.
+  ## (Optional)
+  prefixURL: ""
+
+  ## External URL which can access SQLFlow server
+  ## Maybe same with Ingress host name
+  baseURL: ""
+
+  ## Additional server container environment variables
+  ##
+  ## You specify this manually like you would a raw deployment manifest.
+  ## This means you can bind in environment variables from secrets.
+  ##
+  ## e.g. static environment variable:
+  ##  - name: DEMO_GREETING
+  ##    value: "Hello from the environment"
+  ##
+  ## e.g. secret environment variable:
+  ## - name: USERNAME
+  ##   valueFrom:
+  ##     secretKeyRef:
+  ##       name: mysecret
+  ##       key: username
+  env:
+    - name: SQLFLOW_WORKFLOW_LOGVIEW_ENDPOINT
+      value: '"http://localhost:9001"'
+    - name: SQLFLOW_WORKFLOW_STEP_IMAGE
+      value: sqlflow/sqlflow:step
+    - name: SQLFLOW_WORKFLOW_TTL
+      value: '"600"'
+
+  global:
+  ## Additional SQLFlow server container arguments
+  ##
+  extraArgs: {}
+
+  ## Additional InitContainers to initialize the pod
+  ##
+  extraInitContainers: []
+
+  ## Additional SQLFlow server Volume mounts
+  ##
+  extraVolumeMounts: []
+
+  ## Additional SQLFlow server Volumes
+  ##
+  extraVolumes: []
+
+  ## Additional SQLFlow server hostPath mounts
+  ##
+  extraHostPathMounts: []
+    # - name: certs-dir
+    #   mountPath: /etc/kubernetes/certs
+    #   subPath: ""
+    #   hostPath: /etc/kubernetes/certs
+    #   readOnly: true
+
+  extraConfigmapMounts: []
+    # - name: certs-configmap
+    #   mountPath: /sqlflow
+    #   subPath: ""
+    #   configMap: certs-configmap
+    #   readOnly: true
+
+  ## Additional SQLFlow server Secret mounts
+  # Defines additional mounts with secrets. Secrets must be manually created in the namespace.
+  extraSecretMounts: []
+    # - name: secret-files
+    #   mountPath: /etc/secrets
+    #   subPath: ""
+    #   secretName: prom-secret-files
+    #   readOnly: true
+
+  ## ConfigMap override where fullname is {{.Release.Name}}-{{.Values.server.configMapOverrideName}}
+  ## Defining configMapOverrideName will cause templates/server-configmap.yaml
+  ## to NOT generate a ConfigMap resource
+  ##
+  configMapOverrideName: ""
+
+  ingress:
+    ## If true, SQLFlow server Ingress will be created
+    ##
+    enabled: false
+
+    ## SQLFlow server Ingress annotations
+    ##
+    annotations:
+      kubernetes.io/ingress.class: nginx
+    #   kubernetes.io/tls-acme: 'true'
+
+    ## SQLFlow server Ingress additional labels
+    ##
+    extraLabels: {}
+
+    ## SQLFlow server Ingress hostnames with optional path
+    ## Must be provided if Ingress is enabled
+    ##
+    hosts:
+      - host: sqlflowserver.local
+        paths:
+        - path: /
+          backend:
+            serviceName: sqlflowserver.local
+            servicePort: 80
+
+
+    ## SQLFlow server Ingress TLS configuration
+    ## Secrets must be manually created in the namespace
+    ##
+    tls: []
+    #   - secretName: sqlflowserver-tls
+    #     hosts:
+    #       - sqlflow.domain.com
+
+  ## SQLFlow Server Deployment Strategy type
+  strategy:
+    type: Recreate
+
+  ## Node tolerations for server scheduling to nodes with taints
+  ## Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
+  ##
+  tolerations: []
+    # - key: "key"
+    #   operator: "Equal|Exists"
+    #   value: "value"
+    #   effect: "NoSchedule|PreferNoSchedule|NoExecute(1.6 only)"
+
+  ## Node labels for SQLFlow server pod assignment
+  ## Ref: https://kubernetes.io/docs/user-guide/node-selection/
+  ##
+  nodeSelector: {}
+
+  ## Pod affinity
+  ##
+  affinity: {}
+
+  ## PodDisruptionBudget settings
+  ## ref: https://kubernetes.io/docs/concepts/workloads/pods/disruptions/
+  ##
+  podDisruptionBudget:
+    enabled: false
+    maxUnavailable: 1
+
+  ## Use an alternate scheduler, e.g. "stork".
+  ## ref: https://kubernetes.io/docs/tasks/administer-cluster/configure-multiple-schedulers/
+  ##
+  # schedulerName:
+
+  persistentVolume:
+    ## If true, SQLFlow server will create/use a Persistent Volume Claim
+    ## If false, use emptyDir
+    ##
+    enabled: true
+
+    ## SQLFlow server data Persistent Volume access modes
+    ## Must match those of existing PV or dynamic provisioner
+    ## Ref: http://kubernetes.io/docs/user-guide/persistent-volumes/
+    ##
+    accessModes:
+      - ReadWriteOnce
+
+    ## SQLFlow server data Persistent Volume annotations
+    ##
+    annotations: {}
+
+    ## SQLFlow server data Persistent Volume existing claim name
+    ## Requires server.persistentVolume.enabled: true
+    ## If defined, PVC must be created manually before volume will be bound
+    existingClaim: ""
+
+    ## SQLFlow server data Persistent Volume mount root path
+    ##
+    mountPath: /data
+
+    ## SQLFlow server data Persistent Volume size
+    ##
+    size: 8Gi
+
+    ## SQLFlow server data Persistent Volume Storage Class
+    ## If defined, storageClassName: <storageClass>
+    ## If set to "-", storageClassName: "", which disables dynamic provisioning
+    ## If undefined (the default) or set to null, no storageClassName spec is
+    ##   set, choosing the default provisioner.  (gp2 on AWS, standard on
+    ##   GKE, AWS & OpenStack)
+    ##
+    # storageClass: "-"
+
+    ## SQLFlow server data Persistent Volume Binding Mode
+    ## If defined, volumeBindingMode: <volumeBindingMode>
+    ## If undefined (the default) or set to null, no volumeBindingMode spec is
+    ##   set, choosing the default mode.
+    ##
+    # volumeBindingMode: ""
+
+    ## Subdirectory of SQLFlow server data Persistent Volume to mount
+    ## Useful if the volume's root directory is not empty
+    ##
+    subPath: ""
+
+  emptyDir:
+    ## SQLFlow server emptyDir volume size limit
+    ##
+    sizeLimit: ""
+
+  ## Annotations to be added to SQLFlow server pods
+  ##
+  podAnnotations: {}
+    # iam.amazonaws.com/role: sqlflow
+
+  ## Labels to be added to SQLFlow server pods
+  ##
+  podLabels: {}
+
+  ## SQLFlow server AlertManager configuration
+  ##
+  alertmanagers: []
+
+  ## Specify if a Pod Security Policy for node-exporter must be created
+  ## Ref: https://kubernetes.io/docs/concepts/policy/pod-security-policy/
+  ##
+  podSecurityPolicy:
+    annotations: {}
+      ## Specify pod annotations
+      ## Ref: https://kubernetes.io/docs/concepts/policy/pod-security-policy/#apparmor
+      ## Ref: https://kubernetes.io/docs/concepts/policy/pod-security-policy/#seccomp
+      ## Ref: https://kubernetes.io/docs/concepts/policy/pod-security-policy/#sysctl
+      ##
+      # seccomp.security.alpha.kubernetes.io/allowedProfileNames: '*'
+      # seccomp.security.alpha.kubernetes.io/defaultProfileName: 'docker/default'
+      # apparmor.security.beta.kubernetes.io/defaultProfileName: 'runtime/default'
+
+  ## Annotations to be added to deployment
+  ##
+  deploymentAnnotations: {}
+
+  ## SQLFLow server readiness and liveness probe initial delay and timeout
+  ## Ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/
+  ##
+  readinessProbeInitialDelay: 30
+  readinessProbePeriodSeconds: 5
+  readinessProbeTimeout: 4
+  readinessProbeFailureThreshold: 3
+  readinessProbeSuccessThreshold: 1
+  livenessProbeInitialDelay: 30
+  livenessProbePeriodSeconds: 15
+  livenessProbeTimeout: 10
+  livenessProbeFailureThreshold: 3
+  livenessProbeSuccessThreshold: 1
+
+  ## SQLFlow server resource requests and limits
+  ## Ref: http://kubernetes.io/docs/user-guide/compute-resources/
+  ##
+  resources: {}
+    # limits:
+    #   cpu: 500m
+    #   memory: 512Mi
+    # requests:
+    #   cpu: 500m
+    #   memory: 512Mi
+
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 100
+    targetCPUUtilizationPercentage: 80
+    targetMemoryUtilizationPercentage: 80
+
+  # Required for use in managed kubernetes clusters (such as AWS EKS) with custom CNI (such as calico),
+  # because control-plane managed by AWS cannot communicate with pods' IP CIDR and admission webhooks are not working
+  ##
+  hostNetwork: false
+
+  # When hostNetwork is enabled, you probably want to set this to ClusterFirstWithHostNet
+  dnsPolicy: ClusterFirst
+
+  ## Vertical Pod Autoscaler config
+  ## Ref: https://github.com/kubernetes/autoscaler/tree/master/vertical-pod-autoscaler
+  verticalAutoscaler:
+    ## If true a VPA object will be created for the controller (either StatefulSet or Deployemnt, based on above configs)
+    enabled: false
+    # updateMode: "Auto"
+    # containerPolicies:
+    # - containerName: 'sqlflow-server'
+
+  securityContext:
+    runAsUser: 65534
+    runAsNonRoot: true
+    runAsGroup: 65534
+
+  service:
+    annotations: {}
+    labels: {}
+    NodePort: ""
+
+    ## List of IP addresses at which the SQLFlow server service is available
+    ## Ref: https://kubernetes.io/docs/user-guide/services/#external-ips
+    ##
+    externalIPs: []
+
+    loadBalancerIP: ""
+    loadBalancerSourceRanges: []
+    servicePort: 50051
+    sessionAffinity: None
+    type: NodePort
+
+jupyterhub:
+  ## SQLFlow Jupyter container name
+  ##
+  name: sqlflow-jupyterhub
+
+  enabled: true
+
+  podSecurityContext:
+  fsGroup: 1000
+
+  ## Use a ClusterRole (and ClusterRoleBinding)
+  ## - If set to false - we define a RoleBinding in the defined namespaces ONLY
+  ##
+  ## You MUST also set namespaces to the ones you have access to and want monitored by SQLFlow Jupyter.
+  ##
+  # useExistingClusterRoleName: nameofclusterrole
+
+  ## namespaces to monitor (instead of monitoring all - clusterwide). Needed if you want to run without Cluster-admin privileges.
+  # namespaces:
+  #   - yournamespace
+
+  # sidecarContainers - add more containers to SQLFlow Jupyter
+  # Key/Value where Key is the sidecar `- name: <Key>`
+  # Example:
+  #   sidecarContainers:
+  #      webserver:
+  #        image: nginx
+  sidecarContainers: {}
+
+  ## SQLFlow Jupyter container image
+  ##
+  image:
+    name: jupyterhub
+    repository: sqlflow/sqlflow:jupyterhub
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  nameOverride: "sqlflow-jupyterhub"
+  fullnameOverride: "sqlflow-jupyterhub"
+
+  ## SQLFlow Jupyter priorityClassName
+  ##
+  priorityClassName: ""
+
+  ## EnableServiceLinks indicates whether information about services should be injected
+  ## into pod's environment variables, matching the syntax of Docker links.
+  ## WARNING: the field is unsupported and will be skipped in K8s prior to v1.13.0.
+  ##
+  enableServiceLinks: true
+
+  ## The URL prefix at which the container can be accessed. Useful in the case the '-web.external-url' includes a slug
+  ## so that the various internal URLs are still able to access as they are in the default case.
+  ## (Optional)
+  prefixURL: ""
+
+  ## External URL which can access SQLFlow Jupyter
+  ## Maybe same with Ingress host name
+  baseURL: ""
+
+  ## Additional Jupyter container environment variables
+  ##
+  ## You specify this manually like you would a raw deployment manifest.
+  ## This means you can bind in environment variables from secrets.
+  ##
+  ## e.g. static environment variable:
+  ##  - name: DEMO_GREETING
+  ##    value: "Hello from the environment"
+  ##
+  ## e.g. secret environment variable:
+  ## - name: USERNAME
+  ##   valueFrom:
+  ##     secretKeyRef:
+  ##       name: mysecret
+  ##       key: username
+  env:
+    - name: SQLFLOW_MYSQL_IMAGE
+      value: sqlflow/sqlflow:mysql
+    - name: SQLFLOW_JUPYTER_IMAGE
+      value: sqlflow/sqlflow:jupyter
+    - name: SQLFLOW_JUPYTER_SSL_KEY
+      value: ''
+    - name: SQLFLOW_JUPYTER_SSL_CERT
+      value: ''
+    - name: SQLFLOW_JUPYTER_USE_GITHUB_OAUTH
+      value: "false"
+    - name: SQLFLOW_JUPYTER_OAUTH_CLIENT_ID
+      valueFrom:
+        secretKeyRef:
+          name: sqlflow
+          key: jupyter_oauth_client_id
+    - name: SQLFLOW_JUPYTER_OAUTH_CLIENT_SECRET
+      valueFrom:
+        secretKeyRef:
+          name: sqlflow
+          key: jupyter_oauth_client_secret
+
+  extraEnv:
+
+  global:
+  ## Additional SQLFlow Jupyter container arguments
+  ##
+  extraArgs: {}
+
+  ## Additional InitContainers to initialize the pod
+  ##
+  extraInitContainers: []
+
+  ## Additional SQLFlow Jupyter Volume mounts
+  ##
+  extraVolumeMounts: []
+
+  ## Additional SQLFlow Jupyter Volumes
+  ##
+  extraVolumes: []
+
+  ## Additional SQLFlow Jupyter hostPath mounts
+  ##
+  extraHostPathMounts: []
+    # - name: certs-dir
+    #   mountPath: /etc/kubernetes/certs
+    #   subPath: ""
+    #   hostPath: /etc/kubernetes/certs
+    #   readOnly: true
+
+  extraConfigmapMounts: []
+    # - name: certs-configmap
+    #   mountPath: /sqlflow-jupyter
+    #   subPath: ""
+    #   configMap: certs-configmap
+    #   readOnly: true
+
+  ## Additional SQLFlow Jupyter Secret mounts
+  # Defines additional mounts with secrets. Secrets must be manually created in the namespace.
+  extraSecretMounts: []
+    # - name: secret-files
+    #   mountPath: /etc/secrets
+    #   subPath: ""
+    #   secretName: prom-secret-files
+    #   readOnly: true
+
+  ## ConfigMap override where fullname is {{.Release.Name}}-{{.Values.server.configMapOverrideName}}
+  ## Defining configMapOverrideName will cause templates/server-configmap.yaml
+  ## to NOT generate a ConfigMap resource
+  ##
+  configMapOverrideName: ""
+
+  ingress:
+    ## If true, SQLFlow Jupyter Ingress will be created
+    ##
+    enabled: true
+
+    ## SQLFlow Jupyter Ingress annotations
+    ##
+    annotations:
+      kubernetes.io/ingress.class: nginx
+    #   kubernetes.io/tls-acme: 'true'
+
+    ## SQLFlow Jupyter Ingress additional labels
+    ##
+    extraLabels: {}
+
+    ## SQLFlow Jupyter Ingress hostnames with optional path
+    ## Must be provided if Ingress is enabled
+    ##
+    hosts:
+      - host: sqlflow-jupyter.local
+        paths:
+        - path: /
+          backend:
+            serviceName: sqlflow-jupyter.local
+            servicePort: 80
+
+
+    ## SQLFlow Jupyter Ingress TLS configuration
+    ## Secrets must be manually created in the namespace
+    ##
+    tls: []
+    #   - secretName: sqlflow-jupyter-tls
+    #     hosts:
+    #       - sqlflow-jupyter.domain.com
+
+  ## SQLFlow Jupyter Deployment Strategy type
+  strategy:
+    type: Recreate
+
+  ## Node tolerations for server scheduling to nodes with taints
+  ## Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
+  ##
+  tolerations: []
+    # - key: "key"
+    #   operator: "Equal|Exists"
+    #   value: "value"
+    #   effect: "NoSchedule|PreferNoSchedule|NoExecute(1.6 only)"
+
+  ## Node labels for SQLFlow Jupyter pod assignment
+  ## Ref: https://kubernetes.io/docs/user-guide/node-selection/
+  ##
+  nodeSelector: {}
+
+  ## Pod affinity
+  ##
+  affinity: {}
+
+  ## PodDisruptionBudget settings
+  ## ref: https://kubernetes.io/docs/concepts/workloads/pods/disruptions/
+  ##
+  podDisruptionBudget:
+    enabled: false
+    maxUnavailable: 1
+
+  ## Use an alternate scheduler, e.g. "stork".
+  ## ref: https://kubernetes.io/docs/tasks/administer-cluster/configure-multiple-schedulers/
+  ##
+  # schedulerName:
+
+  persistentVolume:
+    ## If true, SQLFlow server will create/use a Persistent Volume Claim
+    ## If false, use emptyDir
+    ##
+    enabled: true
+
+    name: cert-path
+
+    ## SQLFlow server data Persistent Volume access modes
+    ## Must match those of existing PV or dynamic provisioner
+    ## Ref: http://kubernetes.io/docs/user-guide/persistent-volumes/
+    ##
+    accessModes:
+      - ReadWriteOnce
+
+    ## SQLFlow server data Persistent Volume annotations
+    ##
+    annotations: {}
+
+    ## SQLFlow server data Persistent Volume existing claim name
+    ## Requires server.persistentVolume.enabled: true
+    ## If defined, PVC must be created manually before volume will be bound
+    existingClaim: ""
+
+    ## SQLFlow server data Persistent Volume mount root path
+    ##
+    mountPath: /jupyter/certs
+
+    type: DirectoryOrCreate
+    
+    ## SQLFlow server data Persistent Volume size
+    ##
+    size: 8Gi
+
+    ## SQLFlow server data Persistent Volume Storage Class
+    ## If defined, storageClassName: <storageClass>
+    ## If set to "-", storageClassName: "", which disables dynamic provisioning
+    ## If undefined (the default) or set to null, no storageClassName spec is
+    ##   set, choosing the default provisioner.  (gp2 on AWS, standard on
+    ##   GKE, AWS & OpenStack)
+    ##
+    # storageClass: "-"
+
+    ## SQLFlow server data Persistent Volume Binding Mode
+    ## If defined, volumeBindingMode: <volumeBindingMode>
+    ## If undefined (the default) or set to null, no volumeBindingMode spec is
+    ##   set, choosing the default mode.
+    ##
+    # volumeBindingMode: ""
+
+    ## Subdirectory of SQLFlow server data Persistent Volume to mount
+    ## Useful if the volume's root directory is not empty
+    ##
+    subPath: ""
+
+  emptyDir:
+    ## SQLFlow server emptyDir volume size limit
+    ##
+    sizeLimit: ""
+
+  ## Annotations to be added to SQLFlow Jupyter pods
+  ##
+  podAnnotations: {}
+    # iam.amazonaws.com/role: sqlflow
+
+  ## Labels to be added to SQLFlow Jupyter pods
+  ##
+  podLabels: {}
+
+  ## SQLFlow Jupyter AlertManager configuration
+  ##
+  alertmanagers: []
+
+  ## Specify if a Pod Security Policy for node-exporter must be created
+  ## Ref: https://kubernetes.io/docs/concepts/policy/pod-security-policy/
+  ##
+  podSecurityPolicy:
+    annotations: {}
+      ## Specify pod annotations
+      ## Ref: https://kubernetes.io/docs/concepts/policy/pod-security-policy/#apparmor
+      ## Ref: https://kubernetes.io/docs/concepts/policy/pod-security-policy/#seccomp
+      ## Ref: https://kubernetes.io/docs/concepts/policy/pod-security-policy/#sysctl
+      ##
+      # seccomp.security.alpha.kubernetes.io/allowedProfileNames: '*'
+      # seccomp.security.alpha.kubernetes.io/defaultProfileName: 'docker/default'
+      # apparmor.security.beta.kubernetes.io/defaultProfileName: 'runtime/default'
+
+  ## Annotations to be added to deployment
+  ##
+  deploymentAnnotations: {}
+
+  ## SQLFLow Jupyter readiness and liveness probe initial delay and timeout
+  ## Ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/
+  ##
+  readinessProbeInitialDelay: 30
+  readinessProbePeriodSeconds: 5
+  readinessProbeTimeout: 4
+  readinessProbeFailureThreshold: 3
+  readinessProbeSuccessThreshold: 1
+  livenessProbeInitialDelay: 30
+  livenessProbePeriodSeconds: 15
+  livenessProbeTimeout: 10
+  livenessProbeFailureThreshold: 3
+  livenessProbeSuccessThreshold: 1
+
+  ## SQLFlow Jupyter resource requests and limits
+  ## Ref: http://kubernetes.io/docs/user-guide/compute-resources/
+  ##
+  resources: {}
+    # limits:
+    #   cpu: 500m
+    #   memory: 512Mi
+    # requests:
+    #   cpu: 500m
+    #   memory: 512Mi
+
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 100
+    targetCPUUtilizationPercentage: 80
+    targetMemoryUtilizationPercentage: 80
+
+  # Required for use in managed kubernetes clusters (such as AWS EKS) with custom CNI (such as calico),
+  # because control-plane managed by AWS cannot communicate with pods' IP CIDR and admission webhooks are not working
+  ##
+  hostNetwork: false
+
+  # When hostNetwork is enabled, you probably want to set this to ClusterFirstWithHostNet
+  dnsPolicy: ClusterFirst
+
+  ## Vertical Pod Autoscaler config
+  ## Ref: https://github.com/kubernetes/autoscaler/tree/master/vertical-pod-autoscaler
+  verticalAutoscaler:
+    ## If true a VPA object will be created for the controller (either StatefulSet or Deployemnt, based on above configs)
+    enabled: false
+    # updateMode: "Auto"
+    # containerPolicies:
+    # - containerName: 'sqlflow-jupyter'
+
+  securityContext:
+    runAsUser: 0
+    runAsNonRoot: false
+    runAsGroup: 0
+
+  service:
+    annotations: {}
+    labels: {}
+    NodePort: ""
+
+    ## List of IP addresses at which the SQLFlow Jupyter service is available
+    ## Ref: https://kubernetes.io/docs/user-guide/services/#external-ips
+    ##
+    externalIPs: []
+
+    loadBalancerIP: ""
+    loadBalancerSourceRanges: []
+    servicePort: 8000
+    sessionAffinity: None
+    type: NodePort
+
+
+networkPolicy:
+  ## Enable creation of NetworkPolicy resources.
+  ##
+  enabled: false
+
+# Force namespace of namespaced resources
+forceNamespace: null
+
+initSecretName: sqlflow

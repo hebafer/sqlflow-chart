@@ -1,0 +1,28 @@
+{{- if .Values.sqlflowserver.autoscaling.enabled }}
+apiVersion: autoscaling/v2beta1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "sqlflow.fullname" . }}
+  labels:
+    {{- include "sqlflow.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "sqlflow.fullname" . }}
+  minReplicas: {{ .Values.sqlflowserver.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.sqlflowserver.autoscaling.maxReplicas }}
+  metrics:
+    {{- if .Values.sqlflowserver.autoscaling.targetCPUUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: cpu
+        targetAverageUtilization: {{ .Values.sqlflowserver.autoscaling.targetCPUUtilizationPercentage }}
+    {{- end }}
+    {{- if .Values.sqlflowserver.autoscaling.targetMemoryUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: memory
+        targetAverageUtilization: {{ .Values.sqlflowserver.autoscaling.targetMemoryUtilizationPercentage }}
+    {{- end }}
+{{- end }}
